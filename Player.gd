@@ -7,23 +7,26 @@ extends CharacterBody2D
 @onready var detector: Area2D = $Detector
 @onready var grid: GridContainer = $InventoryUI/Control/Panel/GridContainer
 @onready var health_node: Node = $Health  # узел Health.gd
+@onready var active_icon: TextureRect = $InventoryUI/ActiveItemUI/ActiveIcon  # иконка активного предмета
 
 var last_direction: String = "down"
 var nearby_items: Array = [] 
 var inventory: Array = []     
 var inventory_open: bool = false
 var selected_index: int = -1
+var active_item: Dictionary = {}  # текущий активный предмет
 var is_dead: bool = false
 
 func _ready() -> void:
 	anim.play("idle_down")
 	inventory_ui.visible = false
+	active_icon.visible = false
 	item_label.text = ""
 
 	detector.area_entered.connect(_on_area_entered)
 	detector.area_exited.connect(_on_area_exited)
 
-	# Подписка на сигнал смерти из Health.gd
+	# Подписка на сигнал смерти
 	if health_node and health_node.has_signal("died"):
 		health_node.died.connect(_on_player_died)
 
@@ -48,18 +51,25 @@ func _physics_process(delta: float) -> void:
 	else:
 		play_run(input_vector)
 
+	# Подбор предметов
 	if Input.is_action_just_pressed("interact") and not is_dead:
 		for item in nearby_items:
 			if item.hovered:
 				_pick_up_item(item)
 				break
 
+	# Инвентарь
 	if Input.is_action_just_pressed("inventory") and not is_dead:
 		inventory_open = !inventory_open
 		inventory_ui.visible = inventory_open
 
+	# Drop предметов
 	if Input.is_action_just_pressed("drop") and selected_index != -1 and not is_dead:
 		_drop_selected_item()
+
+	# Использование предмета
+	if Input.is_action_just_pressed("use_item") and selected_index != -1 and not is_dead:
+		_use_selected_item()
 
 # ===================== Анимации ======================
 func play_run(input_vector: Vector2) -> void:
@@ -143,6 +153,11 @@ func _drop_selected_item():
 	dropped.position = final_pos
 	get_parent().add_child(dropped)
 
+	# Если выброшенный предмет был активным — сбрасываем активный
+	if active_item == dropped_data:
+		active_item = {}
+		active_icon.visible = false
+
 	selected_index = -1
 	_update_inventory_ui()
 
@@ -151,6 +166,21 @@ func _is_item_at_position(pos: Vector2) -> bool:
 		if child.is_in_group("Item") and child.position.distance_to(pos) < 16:
 			return true
 	return false
+
+# ===================== Использование предмета ======================
+func _use_selected_item():
+	if selected_index < 0 or selected_index >= inventory.size():
+		return
+
+	active_item = inventory[selected_index]
+	print("Используется предмет:", active_item["name"])
+
+	# Показываем иконку активного предмета в UI
+	if active_item.has("icon") and active_icon:
+		active_icon.texture = active_item["icon"]
+		active_icon.visible = true
+
+	_update_inventory_ui()
 
 # ===================== UI ======================
 func _update_inventory_ui():
@@ -172,7 +202,8 @@ func _update_inventory_ui():
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		button.add_child(icon)
 
-		button.set_pressed(i == selected_index)
+		# Подсвечиваем выбранный и активный предмет
+		button.set_pressed(i == selected_index or inventory[i] == active_item)
 		button.pressed.connect(func():
 			selected_index = i
 			_update_inventory_ui()

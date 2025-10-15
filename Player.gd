@@ -9,6 +9,7 @@ extends CharacterBody2D
 @onready var grid: GridContainer = $InventoryUI/Control/Panel/GridContainer
 @onready var health_node: Node = $Health  # узел Health.gd
 @onready var death_ui: Node = $DeathUI
+@onready var hp_bar: TextureProgressBar = $HealthBar
 
 var damage_label_scene: PackedScene = preload("res://Scene/DamageLabel.tscn")
 var hp: int
@@ -211,12 +212,13 @@ func take_damage(amount: int):
 		return
 
 	hp -= amount
+	hp = clamp(hp, 0, max_hp)  # чтобы не ушёл в минус
+	hp_bar.set_hp(hp)
 	print("Игрок получил урон: ", amount, " HP осталось: ", hp)
 
 	if has_node("AnimationPlayer"):
 		$AnimationPlayer.play("hit")
 
-	# Показываем цифру урона
 	show_damage(amount, global_position)
 
 	if hp <= 0:
@@ -253,3 +255,4 @@ func show_damage(amount: int, pos: Vector2):
 	label.text = str(amount)
 	label.global_position = pos
 	get_tree().current_scene.add_child(label)  # добавляем в текущую сцену
+	

@@ -2,18 +2,25 @@ extends Label
 
 @export var rise_distance: float = 30.0
 @export var duration: float = 0.6
+@export var target_color: Color = Color(1, 0, 0) # Красный
 
 var _start_position: Vector2
 var _elapsed: float = 0.0
+var _start_color: Color
 
 func _ready():
 	_start_position = global_position
+	_start_color = modulate # Сохраняем исходный цвет
 
 func _process(delta):
 	_elapsed += delta
 	if _elapsed < duration:
+		var t = _elapsed / duration
 		# Плавно поднимаем и исчезаем
-		global_position = _start_position + Vector2(0, -(_elapsed / duration) * rise_distance)
-		modulate.a = 1.0 - (_elapsed / duration)
+		global_position = _start_position + Vector2(0, -t * rise_distance)
+		# Меняем прозрачность
+		modulate.a = 1.0 - t
+		# Плавно меняем цвет
+		modulate = _start_color.lerp(target_color, t)
 	else:
 		queue_free()

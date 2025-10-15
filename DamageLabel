@@ -1,0 +1,19 @@
+extends Label
+
+@export var rise_distance: float = 30.0
+@export var duration: float = 0.6
+
+var _start_position: Vector2
+var _elapsed: float = 0.0
+
+func _ready():
+	_start_position = global_position
+
+func _process(delta):
+	_elapsed += delta
+	if _elapsed < duration:
+		# Плавно поднимаем и исчезаем
+		global_position = _start_position + Vector2(0, -(_elapsed / duration) * rise_distance)
+		modulate.a = 1.0 - (_elapsed / duration)
+	else:
+		queue_free()

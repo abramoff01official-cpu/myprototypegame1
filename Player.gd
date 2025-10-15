@@ -1,14 +1,17 @@
 extends CharacterBody2D
 
 @export var speed: float = 200.0
+@export var max_hp: int = 100
 @onready var anim: AnimatedSprite2D = $AnimatedSprite2D
 @onready var inventory_ui: CanvasLayer = $InventoryUI
 @onready var item_label: Label = $InventoryUI/Control/Panel/Label
 @onready var detector: Area2D = $Detector
 @onready var grid: GridContainer = $InventoryUI/Control/Panel/GridContainer
 @onready var health_node: Node = $Health  # узел Health.gd
-@onready var active_icon: TextureRect = $InventoryUI/ActiveItemUI/ActiveIcon  # иконка активного предмета
+@onready var death_ui: Node = $DeathUI
 
+var damage_label_scene: PackedScene = preload("res://Scene/DamageLabel.tscn")
+var hp: int
 var last_direction: String = "down"
 var nearby_items: Array = [] 
 var inventory: Array = []     
@@ -18,10 +21,11 @@ var active_item: Dictionary = {}  # текущий активный предме
 var is_dead: bool = false
 
 func _ready() -> void:
+	hp = max_hp
 	anim.play("idle_down")
 	inventory_ui.visible = false
-	active_icon.visible = false
 	item_label.text = ""
+	death_ui.visible = false
 
 	detector.area_entered.connect(_on_area_entered)
 	detector.area_exited.connect(_on_area_exited)
@@ -153,11 +157,6 @@ func _drop_selected_item():
 	dropped.position = final_pos
 	get_parent().add_child(dropped)
 
-	# Если выброшенный предмет был активным — сбрасываем активный
-	if active_item == dropped_data:
-		active_item = {}
-		active_icon.visible = false
-
 	selected_index = -1
 	_update_inventory_ui()
 
@@ -174,11 +173,6 @@ func _use_selected_item():
 
 	active_item = inventory[selected_index]
 	print("Используется предмет:", active_item["name"])
-
-	# Показываем иконку активного предмета в UI
-	if active_item.has("icon") and active_icon:
-		active_icon.texture = active_item["icon"]
-		active_icon.visible = true
 
 	_update_inventory_ui()
 
@@ -210,3 +204,52 @@ func _update_inventory_ui():
 		)
 
 		grid.add_child(button)
+		
+# ======================= DAMAGE ======================
+func take_damage(amount: int):
+	if is_dead:
+		return
+
+	hp -= amount
+	print("Игрок получил урон: ", amount, " HP осталось: ", hp)
+
+	if has_node("AnimationPlayer"):
+		$AnimationPlayer.play("hit")
+
+	# Показываем цифру урона
+	show_damage(amount, global_position)
+
+	if hp <= 0:
+		die()
+
+# ======================= DIE ======================
+func die():
+	if is_dead:
+		return  # чтобы не вызывалось повторно
+
+	is_dead = true
+	print("Игрок погиб")
+
+	# Скрыть интерфейс инвентаря и выключить управление
+	inventory_open = false
+	inventory_ui.visible = false
+	death_ui.visible = true
+
+	# Остановить движение
+	velocity = Vector2.ZERO
+
+	# Проиграть анимацию смерти
+	anim.play("death")
+
+	# Отключить коллизию (по желанию)
+	if $CollisionShape2D:
+		$CollisionShape2D.disabled = true
+		
+#================ DamageLable ================
+func show_damage(amount: int, pos: Vector2):
+	if damage_label_scene == null:
+		return
+	var label = damage_label_scene.instantiate()
+	label.text = str(amount)
+	label.global_position = pos
+	get_tree().current_scene.add_child(label)  # добавляем в текущую сцену

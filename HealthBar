@@ -1,0 +1,13 @@
+extends TextureProgressBar
+
+@export var smooth_speed: float = 10.0
+var target_value: float
+
+func _ready():
+	target_value = value
+
+func _process(delta: float) -> void:
+	value = lerp(value, target_value, delta * smooth_speed)
+
+func set_hp(new_value: float):
+	target_value = clamp(new_value, min_value, max_value)
